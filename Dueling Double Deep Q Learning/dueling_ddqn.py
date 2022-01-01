@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.keras.optimizers import Adam
-import numpy as np
+from numpy import float32, int32, zeros, bool
 
 
 class DuelingDeepQNetwork(keras.Model):
@@ -26,3 +26,18 @@ class DuelingDeepQNetwork(keras.Model):
         x = self.dense2(x)
         A = self.A(x)
         return A
+
+
+class ReplayBuffer():
+    def __init__(self, max_size, input_shape):
+        self.men_size = max_size
+        self.men_cntr = 0
+
+        self.state_memory = zeros(
+            (self.men_size, *input_shape), dtype=float32)
+        self.new_state_memory = zeros(
+            (self.men_size, *input_shape), dtype=float32)
+
+        self.action_memory = zeros(self.men_size, dtype=int32)
+        self.reward_memory = zeros(self.men_size, dtype=float32)
+        self.terminal_memory = zeros(self.men_size, dtype=bool)
