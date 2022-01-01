@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.keras.optimizers import Adam
-from numpy import float32, int32, zeros, bool, random
+from numpy import float32, int32, zeros, bool, random, array
 
 
 class DuelingDeepQNetwork(keras.Model):
@@ -9,7 +9,7 @@ class DuelingDeepQNetwork(keras.Model):
         super(DuelingDeepQNetwork, self).__init__()
 
         self.dense1 = keras.layers.Dense(fc1_dims, activation='relu')
-        self.dense1 = keras.layers.Dense(fc2_dims, activation='relu')
+        self.dense2 = keras.layers.Dense(fc2_dims, activation='relu')
         self.V = keras.layers.Dense(1, activation=None)
         self.A = keras.layers.Dense(n_actions, activation=None)
 
@@ -26,6 +26,12 @@ class DuelingDeepQNetwork(keras.Model):
         x = self.dense2(x)
         A = self.A(x)
         return A
+
+    def save(self, path):
+        self.save_weights(path)
+
+    def load(self, path):
+        self.load_weights(path)
 
 
 class ReplayBuffer():
@@ -88,12 +94,21 @@ class Agent():
 
     def choose_action(self, observation):
         if random.random() > self.epsilon:
-            state = tf.convert_to_tensor([observation], dtype=tf.float32)
+            state = array([observation])
             actions = self.q_val.advantage(state)
-            action = tf.argmax(actions).numpy()
+            action = tf.argmax(actions, axis=1).numpy()
+            action = action[0]
         else:
             action = random.choice(self.action_space)
         return action
+
+    def save_model(self, path):
+        self.q_val.save(path+'_q_val')
+        self.q_next.save(path+'_q_next')
+
+    def load_model(self, path):
+        self.q_val.load(path+'_q_val')
+        self.q_next.load(path+'_q_next')
 
     def learn(self):
         if self.memory.men_cntr < self.batch_size:
@@ -103,7 +118,7 @@ class Agent():
             self.q_next.set_weights(self.q_val.get_weights())
 
         state, action, reward, state_, done = self.memory.sample_buffer(
-            self.memory.sample_buffer(self.batch_size))
+            self.batch_size)
 
         q_pred = self.q_val(state)
         q_next = self.q_next(state_)
