@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.keras.optimizers import Adam
-from numpy import float32, int32, zeros, bool
+from numpy import float32, int32, zeros, bool, random
 
 
 class DuelingDeepQNetwork(keras.Model):
@@ -41,3 +41,21 @@ class ReplayBuffer():
         self.action_memory = zeros(self.men_size, dtype=int32)
         self.reward_memory = zeros(self.men_size, dtype=float32)
         self.terminal_memory = zeros(self.men_size, dtype=bool)
+
+    def store_transition(self, state, action, reward, state_, done):
+        index = self.men_cntr % self.men_size
+        self.state_memory[index] = state
+        self.new_state_memory[index] = state_
+        self.action_memory[index] = action
+        self.reward_memory[index] = reward
+        self.terminal_memory[index] = done
+
+        self.men_cntr += 1
+
+    def sample_buffer(self, batch_size):
+        max_men = min(self.men_cntr, self.men_size)
+        batch = random.choice(max_men, batch_size, replace=False)
+
+        states = self.state_memory[batch]
+        states_ = self.new_state_memory[batch]
+        actions = self.
