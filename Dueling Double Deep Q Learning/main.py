@@ -14,6 +14,7 @@ n_games = 2000
 scores = []
 eps_history = []
 avg_scores = []
+isLearning = False
 
 
 def toJSon():
@@ -37,8 +38,10 @@ for i in range(n_games):
         score += reward
         agent.store_transition(observation, action, reward, observation_, done)
         observation = observation_
-        env.render()
-        # agent.learn()
+        if not isLearning:
+            env.render()
+        else:
+            agent.learn()
     eps_history.append(agent.epsilon)
     scores.append(score)
     avg_score = np.mean(scores[-100:])
@@ -46,5 +49,7 @@ for i in range(n_games):
     print('episode ', i, 'score %.2f' % score,
           'average score %.2f' % avg_score,
           'epsilon %.2f' % agent.epsilon)
-    agent.save_model('./models/lunar/lunar_ddqn')
+
+    if isLearning:
+        agent.save_model('./models/lunar/lunar_ddqn')
     toJSon()
