@@ -37,8 +37,8 @@ for i in range(n_games):
         score += reward
         agent.store_transition(observation, action, reward, observation_, done)
         observation = observation_
-        # env.render()
-        agent.learn()
+        env.render()
+        # agent.learn()
     eps_history.append(agent.epsilon)
     scores.append(score)
     avg_score = np.mean(scores[-100:])
