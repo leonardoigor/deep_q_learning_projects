@@ -1,89 +1,131 @@
 import cv2 as cv
 import time
-from numpy import concatenate, array, zeros
+from numpy import concatenate, array, zeros, polyfit
 import threading as th
+import os
+import cvzone as zone
+from cvzone.ColorModule import ColorFinder
 
 
-done = True
-img = ''
-debugger = True
-grayimg, blurimg, cannyImg, imgCopyC = zeros((480, 640, 3)),  zeros(
-    (480, 640, 3)),  zeros((480, 640, 3)),  zeros((480, 640, 3))
-kernel1 = 190
-kernel2 = 10
-roi = zeros((200, 400, 3))
+videos = []
+listDir = os.listdir("Videos")
+colorFind = ColorFinder(False)
+
+for i in listDir:
+    videos.append(cv.VideoCapture("Videos/" + i))
 
 
-imgCopy = zeros((480, 640, 3))
+pathN = 'Ball.png'
+cv.namedWindow("TrackedBars")
+cv.resizeWindow("TrackedBars", 640, 240)
 
 
-def getImg():
-    global img
-    img = 'basketshoot/teste.png'
-
-    img = cv.imread(img)
-    height, width = (480, 640)
-    img = cv.resize(img, (width, height))
+minC, maxC = array([0, 49, 117]), array([58, 121, 255])
+hsv = {'hmin': 0, 'smin': 150, 'vmin': 0, 'hmax': 18, 'smax': 244, 'vmax': 255}
 
 
-def getFps(last_time):
-    fps = 1 / (time.time() - last_time)
-    return fps, time.time()
+X_, Y_ = [], []
 
 
-def getContours(img):
-    global grayimg, blurimg, cannyImg, imgCopyC, kernel1, kernel2, done, imgCopy, roi
-    done = False
-    imgCopy = img.copy()
-    grayimg = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    blurimg = cv.GaussianBlur(grayimg, (5, 5), 1)
-    cannyImg = cv.Canny(blurimg, kernel1, kernel2)
-    countours, _ = cv.findContours(
-        cannyImg, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    imgCopyC = grayimg.copy()
-    imgCopyC = cv.drawContours(imgCopyC, countours, -1, (0, 255, 0), 3)
-    maxArea = 0
-    maxAdges = []
-    for c in countours:
-        boundingBox = cv.boundingRect(c)
-        roi = imgCopy[boundingBox[1]:boundingBox[1] + boundingBox[3],
-                      boundingBox[0]:boundingBox[0] + boundingBox[2]]
+def on_trackbar(v):
+    global minC, maxC
+    hue_min = cv.getTrackbarPos("Hue Min", "TrackedBars")
+    hue_max = cv.getTrackbarPos("Hue Max", "TrackedBars")
+    sat_min = cv.getTrackbarPos("Sat Min", "TrackedBars")
+    sat_max = cv.getTrackbarPos("Sat Max", "TrackedBars")
+    val_min = cv.getTrackbarPos("Val Min", "TrackedBars")
+    val_max = cv.getTrackbarPos("Val Max", "TrackedBars")
 
-        area = cv.contourArea(c)
-        if area > 100:
-            peri = cv.arcLength(c, True)
-            adges = cv.approxPolyDP(c, 0.02*peri, True)
-            if area > maxArea and len(adges) == 4:
-                maxArea = area
-                maxAdges = adges
-    if len(maxAdges) != 0:
-        cv.drawContours(imgCopy, maxAdges, -1, (0, 255, 0), 10)
-    roi = cv.resize(roi, (200, 400))
-    done = True
+    lower = array([hue_min, sat_min, val_min])
+    upper = array([hue_max, sat_max, val_max])
+
+    # minC = lower
+    # maxC = upper
 
 
-cap = cv.VideoCapture(0)
-started_time = time.time()
+cv.createTrackbar("Hue Min", "TrackedBars", 0, 179, on_trackbar)
+cv.createTrackbar("Hue Max", "TrackedBars", 179, 179, on_trackbar)
+cv.createTrackbar("Sat Min", "TrackedBars", 0, 255, on_trackbar)
+cv.createTrackbar("Sat Max", "TrackedBars", 255, 255, on_trackbar)
+cv.createTrackbar("Val Min", "TrackedBars", 0, 255, on_trackbar)
+cv.createTrackbar("Val Max", "TrackedBars", 255, 255, on_trackbar)
+
+
+def getArea(img):
+    percent = img.shape[0]*.875
+    percent = int(percent)
+    img = img[:percent, :, :]
+    return img
+
+
+def trackBall(img):
+    mask = cv.inRange(img, minC, maxC)
+    return cv.bitwise_and(img, img, mask=mask), mask
+
+
+def findContours(img, mask):
+    # img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+    img, mask = colorFind.update(img, mask)
+    contoursImg, contours = zone.findContours(img, mask, minArea=200)
+    return contoursImg, contours
+
+
+index = 0
+
+
+def readAll():
+
+    for i in listDir:
+        videos.append(cv.VideoCapture("Videos/" + i))
+
+    # for v in videos:
+    #     v.read()
+
+
+times = 1
+
+xList = [ii for ii in range(0, 2000)]
+
+
+def predict(img):
+
+    # polinomial regression y=AX^2+BX+C
+
+    A, B, C = polyfit(X_, Y_, 2)
+    for x in xList:
+        y = A*x**2 + B*x + C
+
+        cv.circle(img, (int(x), int(y)), 2, (0, 0, 255), -1)
+
+
 while True:
-    getImg()
-    th1 = th.Thread(target=getContours, args=(img,))
-    fps, started_time = getFps(started_time)
-    # cv.putText(img, 'FPS: ' + str(fps), (10, 30),
-    #            cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-    concat = concatenate((img, imgCopy), axis=1)
-    cv.imshow('stack', concat)
-    if debugger:
-        stack = concatenate((grayimg, blurimg, cannyImg, imgCopyC), axis=1)
-        cv.imshow('stackDebugger', stack)
-    cv.imshow('roi', roi)
+    ready, img = videos[index].read()
+    if ready:
+        img = cv.resize(img, (600, 600))
+        img = getArea(img)
+        img_orig = img.copy()
+        # img, mask = trackBall(img)
+        img, contours = findContours(img, hsv)
+        if len(contours) > 0:
+            cx, cy = contours[0]['center']
+            X_.append(cx)
+            Y_.append(cy)
+        # img = cv.drawContours(img, contour, -1, (0, 255, 0), 3)
+        for i, x in enumerate(X_):
+            y = Y_[i]
+            cv.circle(img_orig, (x, y), 5, (0, 255, 0), -1)
 
-    # kernel1 = input("kernel1 ")  # Python 3
-    # kernel1 = int(kernel1)
-    # kernel2 = input("kernel2 ")  # Python 3
-    # kernel2 = int(kernel2)
-    if done:
-        th1.start()
-    if cv.waitKey(20) & 0xFF == ord('q'):
+        if len(X_) > 2:
+            predict(img_orig)
+        cv.imshow('img', img)
+        cv.imshow('img_orig', img_orig)
+    if not ready:
+        index = times % len(videos)
+        times += 1
+        readAll()
+        X_, Y_ = [], []
+        ready, img = videos[index].read()
+    if cv.waitKey(100) & 0xFF == ord('q'):
         break
 
 cv.destroyAllWindows()
